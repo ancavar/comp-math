@@ -3,17 +3,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define BLOCK_SIZE 128
+
+int BLOCK_SIZE = 32;
+
 #define eps 0.000001
 
-typedef struct net_t {
-    double** u;
-    double** f;
+// number of samples
+#define SAMPLE_SIZE 10
+
+typedef struct {
+    double **u;
+    double **f;
     double h;
     size_t size;
-};
+} net_t;
 
-// todo: replace (global variable bad!)
+typedef struct {
+    double avg_time;
+    double std_dev;
+} stats_t;
+
+
+
 int counter;
 
 // todo: hardcoded -- bad!!!
@@ -35,7 +46,31 @@ double fun_u(double x, double y) {
 
 }
 
-double process_block(struct net_t* net, int i, int j) {
+double book_fun_f(double x, double y) {
+    return 0;
+}
+double book_fun_u(double x, double y) {
+    if (x == 0) {
+        return 100-200*y;
+    }
+    if (y == 0) {
+        return 100-200*x;
+    }
+    if (x == 1) {
+        return -100+200*y;
+    }
+    if (y == 1) {
+        return -100+200*x;
+    }
+
+    srand(9255132);
+    // random approximation [-100; 100]
+    return (rand() % 201) - 100;
+
+
+}
+
+double process_block(net_t* net, int i, int j) {
     double dmax = 0;
     int i_start = 1 + i * BLOCK_SIZE;
     int j_start = 1 + j * BLOCK_SIZE;
@@ -52,17 +87,17 @@ double process_block(struct net_t* net, int i, int j) {
     return dmax;
 }
 
-void process_net(struct net_t* net) {
-    int i, j;
+void process_net(net_t* net) {
+    int i, j, nx;
     int NB = ceil((double)net->size / BLOCK_SIZE);
     double dmax;
     double dm[NB];
     do {
         counter++;
         dmax = 0.0;
-        for (int nx = 0; nx < NB; nx++) {
+        for (nx = 0; nx < NB; nx++) {
             dm[nx] = 0;
-#pragma omp parallel for shared(nx, dm) private(i,j)
+#pragma omp parallel for shared(dmax, nx, dm) private(i,j)
             for (i = 0; i < nx + 1; i++) {
                 j = nx - i;
                 double d = process_block(net, i, j);
@@ -71,7 +106,7 @@ void process_net(struct net_t* net) {
             }
         }
         for (int nx = NB - 2; nx > -1; nx--) {
-#pragma omp parallel for shared(nx, dm) private(i, j)
+#pragma omp parallel for shared(dmax, nx, dm) private(i,j)
             for (i = 0; i < nx + 1; i++) {
                 j = 2 * (NB - 1) - nx - i;
                 double d = process_block(net, i, j);
@@ -94,7 +129,7 @@ double** allocate_array(size_t size) {
     return x;
 }
 
-struct net_t init_net(size_t size) {
+net_t init_net(size_t size) {
     // size (according to the book) refers to an inner matrix
     // that is without borders, hence size + 1
     double** u = allocate_array(size+2);
@@ -107,11 +142,11 @@ struct net_t init_net(size_t size) {
         }
     }
 
-    struct net_t net = {u, f, h, size};
+    net_t net = {u, f, h, size};
     return net;
 }
 
-void free_net(struct net_t* net) {
+void free_net(net_t* net) {
     for (int i = 0; i < net->size + 1; i++) {
         free(net->u[i]);
         free(net->f[i]);
@@ -120,34 +155,60 @@ void free_net(struct net_t* net) {
     free(net->f);
 }
 
+
+void calculate_stats(double *times, int n, stats_t *stats) {
+    double sum = 0;
+    for (int i = 0; i < n; i++) {
+        sum += times[i];
+    }
+    stats->avg_time = sum / n;
+
+    double sum_of_squares = 0;
+    for (int i = 0; i < n; i++) {
+        sum_of_squares += pow(times[i] - stats->avg_time, 2);
+    }
+    stats->std_dev = sqrt(sum_of_squares / (n - 1));
+}
+
 int main() {
 
-    size_t test_size[6] = {500, 1000, 2000, 3000, 5000, 7000};
-    printf("%s%12s%15s%13s\n", "Net size", "Threads", "Iterations", "Time (s)");
-    for (int i = 0; i < 6; i++ ) {
-        for (int num_threads = omp_get_num_procs(); num_threads > 0; num_threads /= 2) {
-            omp_set_num_threads(num_threads);
-            double avg_time = 0;
-            // todo: a mess with memory leaks , refactor
-            int j;
-            for (j = 0; j < 5; j++) {
-                counter = 0;
-                struct net_t net = init_net(test_size[i]);
-                double start_time = omp_get_wtime();
-                process_net(&net);
-//                int p = 3 * net.size / 4;
-//            printf("start: %f    end: %f    real: %f\n", fun_u(p * net.h, p * net.h), net.u[p][p],
-//                   exp(-(p * net.h * p * net.h)));
-                double end_time = omp_get_wtime(); // End timing
-                avg_time += end_time - start_time;
-                free_net(&net);
-            }
-            avg_time /= j;
-            printf("%ld%12d%11d%22f\n", test_size[i], num_threads, counter, avg_time);
-        }
-        printf("------------------------------------------------\n");
+    size_t bench[48];
+    for (int i = 0; i <= 40; i++) {
+        bench[i] = ceil(500 + 30*pow(i, 1.3));
     }
 
+    int num_threads_list[6] = {1, 2, 4, 8};
+
+    size_t test_block_size[9] = {16, 32, 48, 64, 86, 108, 128, 192, 256};
+    size_t test_size[6] = {500, 1000, 2000, 3000, 5000, 7000};
+    printf("| %s | %s | %s | %s | %s | %s |\n", "Net size", "Block size", "Threads", "Iterations", "Mean time (s)", "Standard dev.");
+    printf("|----------|------------|---------|------------|---------------|---------------|\n");
+
+    double times[SAMPLE_SIZE];
+    for (int blck_sz = 0; blck_sz <= 8; blck_sz++) {
+        BLOCK_SIZE = test_block_size[blck_sz];
+        for (int i = 0; i <= 5; i++ ) {
+            for (int k = 16; k >= 1; k /= 2 ) {
+                omp_set_num_threads(k);
+                for (int j = 0; j < SAMPLE_SIZE; j++) {
+                    counter = 0;
+                    net_t net = init_net(test_size[i]);
+                    double start_time = omp_get_wtime();
+                    process_net(&net);
+    //                int p = 3 * net.size / 4;
+    //            printf("start: %f    end: %f    real: %f\n", fun_u(p * net.h, p * net.h), net.u[p][p],
+    //                   exp(-(p * net.h * p * net.h)));
+                    double end_time = omp_get_wtime(); // End timing
+                    times[j] = end_time - start_time;
+                    free_net(&net);
+                }
+
+                stats_t stats;
+                calculate_stats(times, SAMPLE_SIZE, &stats);
+                printf("| %8ld | %10d | %7d | %10d | %13f | %13f |\n", test_size[i], BLOCK_SIZE, k, counter, stats.avg_time, stats.std_dev);
+            }
+        }
+    }
 
     return 0;
 }
