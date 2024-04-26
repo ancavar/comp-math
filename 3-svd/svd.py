@@ -25,7 +25,7 @@ def compress_image(in_file, out_file, ratio, svd):
         image_data = np.array(image)
 
     m, n = image.size
-    k = int(n * m / (4 * ratio * (n + m + 1)))
+    k = int(n * m / (8 * ratio * (n + m + 1)))
     payload = b""
     for channel in range(3):
         channel_data = image_data[:, :, channel]
