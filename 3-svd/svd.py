@@ -53,7 +53,7 @@ def decompress_image(in_file, out_file):
         offset, count = offset + count * 8, height * k 
         compressed_data[f'V{channel}'] = np.frombuffer(payload, dtype=np.float64, count = count, offset=offset).reshape((k, height))
 
-    reconstructed_image = np.zeros((height, width, channels), dtype=np.uint8)
+    reconstructed_image = np.zeros((width, height, channels), dtype=np.uint8)
     for channel in range(3):
         U, s, VT = compressed_data[f'U{channel}'], compressed_data[f's{channel}'], compressed_data[f'V{channel}']
         reconstructed_image[:, :, channel] = (U @ np.diag(s) @ VT).clip(0, 255).astype(np.uint8)
