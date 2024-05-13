@@ -10,7 +10,7 @@
 ### Алгоритмы:
 * numpy - ```numpy.linalg.svd```
 * simple (power method) - https://www.jeremykun.com/2016/05/16/singular-value-decomposition-part-2-theorem-proof-algorithm/
-* advanced (jacobi method) - https://github.com/zlliang/jacobi-svd/blob/master/presentation.pdf
+* advanced (randomized method) - https://gregorygundersen.com/blog/2019/01/17/randomized-svd/
 
 
 
@@ -18,7 +18,7 @@
 | --- | --- | --- |
 | numpy | <img src="captchas/numpy.bmp" width="250px"> | 2 |
 | simple | <img src="captchas/simple.bmp" width="250px"> | 3148
-| advanced | <img src="captchas/jacobi.bmp" width="250px"> | 669 |
+| advanced | <img src="captchas/randomized.bmp" width="250px"> | 77 |
 
 
 При внимательном изучении "разжатых" картинок заметных различий найдено не было. 
@@ -31,6 +31,14 @@
 | --- | --- | --- |
 | numpy | <img src="rainbow/numpy.bmp" width="250px"> | 0.14 |
 | simple | <img src="rainbow/simple.bmp" width="250px"> | 302 |
-| advanced | <img src="rainbow/jacobi.bmp" width="250px"> | 40 |
+| advanced | <img src="rainbow/randomized.bmp" width="250px"> | 2.7 |
 
-Однако и здесь не было замечено разницы между разными алгоритмами. Увы.
+Однако и здесь не было замечено разницы между разными алгоритмами.
+
+| Алгоритм | Сжатие x5 | Время работы (сек.) |
+| --- | --- | --- |
+| numpy | <img src="RGB/numpy.bmp" width="250px"> | 0.02 |
+| simple | <img src="RGB/simple.bmp" width="250px"> | 7.44 |
+| advanced | <img src="RGB/randomized.bmp" width="250px"> | 0.24 |
+
+Здесь можно лишь заметить некоторую "рябь" на изображении, полученном с помощью рандомного алгоритма.

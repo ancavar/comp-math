@@ -2,8 +2,9 @@ import argparse
 import numpy as np
 from PIL import Image
 from power_svd import power_method
-from jacobi_svd import jacobi_method
+from randomized_svd import randomized_method
 import struct
+import time
 
 # SVD Compressed Unified Format
 SCUF_FORMAT = "<4s32sIIII" 
@@ -27,10 +28,13 @@ def compress_image(in_file, out_file, ratio, svd):
     m, n = image.size
     k = int(n * m / (8 * ratio * (n + m + 1)))
     payload = b""
+    t0 = time.time()
     for channel in range(3):
         channel_data = image_data[:, :, channel]
         U, s, VT = svd(channel_data)
         payload += U[:, :k].tobytes() + s[:k].tobytes() + VT[:k, :].tobytes()
+    t1 = time.time()
+    print(t1-t0)
 
     save_scuf(out_file, "BMP", image_data.shape, k,  payload)
 
@@ -79,7 +83,7 @@ if __name__ == "__main__":
     methods = {
         'numpy': np.linalg.svd,
         'simple': power_method,
-        'advanced': jacobi_method
+        'advanced': randomized_method
     }
 
     if args.mode == 'compress':
