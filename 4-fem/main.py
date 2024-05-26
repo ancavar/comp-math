@@ -90,6 +90,8 @@ def calculate_error(L, N, h, x, y_approx):
     print(f'λ = {λ}, N = {N}')
     print(f'Полученная = {left}, ожидаемая = {right} -- {result}')
 
+    return left, right
+
 def norm_L(func, L):
     return np.sqrt(quad(lambda x: func(x)**2, 0, L)[0])
 
@@ -97,7 +99,9 @@ def main():
     global λ
 
     Ns = [10, 100, 1000, 10000]
-    for λ in range(1, 5):
+    errors = []
+
+    for λ in range(1, 2):
         λ **= 2
         for idx, N in enumerate(Ns, start = 1):        
             a, b = 0, 2*np.pi
@@ -105,8 +109,18 @@ def main():
             h = np.diff(x)
             y_coeffs = find_coeffs(x, N, h)
             y = y_approx(y_coeffs, x, N)
-            calculate_error(b, N, h, x, y)
+            errors.append(calculate_error(b, N, h, x, y))
             # plot_functions(a, b, y, N)
+            
+    h = [1/N for N in Ns]
+    plt.figure(figsize=(10, 6))
+    plt.loglog(h, errors[0:4], 'o-', label=['Actual', 'Expected'])  
+    plt.title('Convergence Rate')
+    plt.xlabel('Grid size h')
+    plt.ylabel('Error')
+    plt.grid(True, which="both", ls="--")
+    plt.legend()
+    plt.savefig('error.png')
 
 
 # def plot_functions(a, b, y, N):
